@@ -1,0 +1,4 @@
+dockify.db
+.env
+target/
+code
