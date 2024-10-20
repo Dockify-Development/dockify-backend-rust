@@ -1,6 +1,12 @@
+/*
+    This source file is a part of Dockify
+    Dockify is licensed under the Server Side Public License (SSPL), Version 1.
+    Find the LICENSE file in the root of this repository for more details.
+*/
+
 #![warn(unused_variables)]
 use axum::{
-    body::Body, extract::Request, http::StatusCode, response::IntoResponse, routing::post, Router,
+    body::Body, extract::Request, http::StatusCode, response::IntoResponse, routing::get, Router,
 };
 
 use crate::utils::{
@@ -35,5 +41,5 @@ pub async fn handler(req: Request<Body>) -> impl IntoResponse {
 }
 
 pub fn get_routes() -> Router {
-    Router::new().route("/api/get_containers", post(handler))
+    Router::new().route("/api/get_containers", get(handler))
 }

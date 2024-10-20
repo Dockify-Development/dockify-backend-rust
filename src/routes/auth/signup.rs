@@ -1,3 +1,9 @@
+/*
+    This source file is a part of Dockify
+    Dockify is licensed under the Server Side Public License (SSPL), Version 1.
+    Find the LICENSE file in the root of this repository for more details.
+*/
+
 use crate::utils::{
     db,
     validation::{self, validate_email},
@@ -39,7 +45,6 @@ pub async fn handler(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
     let username = payload.username;
     let email = payload.email;
     if !&username.is_ascii() || !validate_email(&email) {
-        println!("{} {}", !&username.is_ascii(), !validate_email(&email));
         return StatusCode::BAD_REQUEST;
     }
     let checks = vec![

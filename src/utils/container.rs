@@ -1,22 +1,38 @@
+/*
+    This source file is a part of Dockify
+    Dockify is licensed under the Server Side Public License (SSPL), Version 1.
+    Find the LICENSE file in the root of this repository for more details.
+*/
+
 use std::{collections::HashMap, future::Future, net::TcpListener};
 
 use axum::http::StatusCode;
 use bollard::{
-    container::{Config, CreateContainerOptions, StartContainerOptions},
+    container::{
+        Config, CreateContainerOptions, RemoveContainerOptions, StartContainerOptions,
+        StopContainerOptions,
+    },
+    errors::Error,
     secret::{HostConfig, PortBinding},
     Docker,
 };
+use serde::Deserialize;
 
 use crate::{
-    routes::create_container::ContainerInfo,
+    routes::container::create::ContainerInfo,
     utils::{
         db::{self},
-        res::{m_resp, CReturn},
+        res::{m_resp, GenericResponse},
         resources::ContainerResources,
     },
 };
 
-use super::res::Respond;
+use super::{db::Container, res::Respond};
+
+#[derive(Deserialize)]
+pub struct ContainerName {
+    pub name: String,
+}
 
 pub fn create_config(
     ports: HashMap<u16, u16>,
@@ -175,9 +191,9 @@ pub fn create_container(
         println!("Container started successfully.");
 
         match db::insert_container(&container.id, username, name, config, container_port).await {
-            Ok(updated) if updated > 0 => Respond::Container(
+            Ok(updated) if updated > 0 => Respond::Generic(
                 StatusCode::OK,
-                CReturn {
+                GenericResponse::Container {
                     id: container.id,
                     port: container_port,
                 },
@@ -192,4 +208,88 @@ pub fn create_container(
             ),
         }
     };
+}
+
+pub async fn delete_container_by_name(docker: &Docker, container_name: &str) -> Result<(), Error> {
+    let remove_options = Some(RemoveContainerOptions {
+        force: true, // Force remove if running
+        ..Default::default()
+    });
+
+    docker
+        .remove_container(container_name, remove_options)
+        .await?;
+    println!("Container '{}' deleted successfully.", container_name);
+
+    Ok(())
+}
+pub fn container_exists(containers: &Vec<Container>, search_name: &str) -> bool {
+    containers
+        .iter()
+        .any(|container| container.name == search_name)
+}
+
+pub async fn start_container(name: &str) -> Result<(), Error> {
+    let docker = Docker::connect_with_local_defaults()?;
+
+    let containers = docker
+        .list_containers::<String>(None)
+        .await?
+        .into_iter()
+        .filter(|container| {
+            if let Some(names) = &container.names {
+                names.iter().any(|n| n.as_str() == format!("/{}", name))
+            } else {
+                false
+            }
+        })
+        .collect::<Vec<_>>();
+    if let Some(container) = containers.first() {
+        let container_id = &container.id;
+        docker
+            .start_container::<String>(
+                &container_id.clone().unwrap(),
+                None::<StartContainerOptions<String>>,
+            )
+            .await?;
+        Ok(())
+    } else {
+        println!("No container found with name: {}", name);
+        Err(Error::DockerResponseServerError {
+            status_code: 404,
+            message: "Container not found".to_string(),
+        })
+    }
+}
+
+pub async fn stop_container(name: &str) -> Result<(), Error> {
+    let docker = Docker::connect_with_local_defaults()?;
+    let options = StopContainerOptions {
+        ..Default::default()
+    };
+    let containers = docker
+        .list_containers::<String>(None)
+        .await?
+        .into_iter()
+        .filter(|container| {
+            if let Some(names) = &container.names {
+                names.iter().any(|n| n.as_str() == format!("/{}", name))
+            } else {
+                false
+            }
+        })
+        .collect::<Vec<_>>();
+    if let Some(container) = containers.first() {
+        let container_id = &container.id;
+        docker
+            .stop_container(&container_id.clone().unwrap(), Some(options))
+            .await?;
+        Ok(())
+    } else {
+        println!("No container found with name: {}", name);
+        Err(Error::DockerResponseServerError {
+            status_code: 404,
+            message: "Container not found".to_string(),
+        })
+    }
 }

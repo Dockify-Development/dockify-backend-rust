@@ -1,3 +1,9 @@
+/*
+    This source file is a part of Dockify
+    Dockify is licensed under the Server Side Public License (SSPL), Version 1.
+    Find the LICENSE file in the root of this repository for more details.
+*/
+
 use bollard::container::Config;
 use rusqlite::{params, Connection, Result};
 use serde::Serialize;
@@ -219,9 +225,9 @@ pub fn get_user_containers(username: &str) -> Result<Vec<Container>> {
 pub fn get_user_credits(username: &str) -> Result<i64> {
     let conn = Connection::open("./dockify.db")?;
     let mut stmt = conn.prepare("SELECT credits FROM credits WHERE username = ?1")?;
-    
+
     let credits: Option<i64> = stmt.query_row(params![username], |row| row.get(0)).ok();
-    
+
     match credits {
         Some(credits) => Ok(credits),
         None => {

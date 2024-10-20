@@ -1,3 +1,9 @@
+/*
+    This source file is a part of Dockify
+    Dockify is licensed under the Server Side Public License (SSPL), Version 1.
+    Find the LICENSE file in the root of this repository for more details.
+*/
+
 use axum::{
     body::{self, Body},
     extract::Request,
@@ -40,27 +46,29 @@ pub async fn handler(req: Request<Body>) -> impl IntoResponse {
             "User doesn't have admin permissions.",
         );
     }
-    let body: CreditsBody = match from_slice::<CreditsBody>(&match body::to_bytes(body, usize::MAX)
-        .await
-    {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return m_resp(
-                StatusCode::BAD_REQUEST,
-                "Failed to parse bytes from request body",
-            )
-        }
-    }) {
-        Ok(info) => info,
-        Err(_) => {
-            return m_resp(
+    let body: CreditsBody =
+        match from_slice::<CreditsBody>(&match body::to_bytes(body, usize::MAX).await {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return m_resp(
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse bytes from request body",
+                )
+            }
+        }) {
+            Ok(info) => info,
+            Err(_) => {
+                return m_resp(
                 StatusCode::BAD_REQUEST,
                 "Failed to parse JSON from request body. Ensure the correct parameters are given.",
             );
-        }
-    };
+            }
+        };
     if let Err(rusqlite::Error::QueryReturnedNoRows) = db::get_user_info(&body.username) {
         return m_resp(StatusCode::BAD_REQUEST, "User not found.");
+    }
+    if body.credits < 0 {
+        return m_resp(StatusCode::BAD_REQUEST, "Please set a valid number.");
     }
     match db::set_user_credits(&body.username, body.credits) {
         Ok(_) => {
@@ -83,5 +91,5 @@ pub async fn handler(req: Request<Body>) -> impl IntoResponse {
 }
 
 pub fn get_routes() -> Router {
-    Router::new().route("/api/admin/add_credits", post(handler))
+    Router::new().route("/api/admin/set_credits", post(handler))
 }

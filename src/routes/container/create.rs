@@ -1,3 +1,9 @@
+/*
+    This source file is a part of Dockify
+    Dockify is licensed under the Server Side Public License (SSPL), Version 1.
+    Find the LICENSE file in the root of this repository for more details.
+*/
+
 use axum::{
     body,
     extract::Request,
@@ -20,9 +26,12 @@ use crate::utils::{
 fn default_shares() -> i64 {
     512
 }
-
+fn default_image() -> String {
+    "dorowu/ubuntu-desktop-lxde-vnc".to_string()
+}
 #[derive(Deserialize)]
 pub struct ContainerInfo {
+    #[serde(default = "default_image")]
     pub image: String,
     pub memory: i64,
     pub memory_swap: i64,
@@ -64,28 +73,24 @@ async fn handler(req: Request<axum::body::Body>) -> impl IntoResponse {
             }
         },
     };
-    let container_info: ContainerInfo = match from_slice::<ContainerInfo>(&match body::to_bytes(
-        body,
-        usize::MAX,
-    )
-    .await
-    {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            return m_resp(
-                StatusCode::BAD_REQUEST,
-                "Failed to parse bytes from request body",
-            )
-        }
-    }) {
-        Ok(info) => info,
-        Err(_) => {
-            return m_resp(
+    let container_info: ContainerInfo =
+        match from_slice::<ContainerInfo>(&match body::to_bytes(body, usize::MAX).await {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return m_resp(
+                    StatusCode::BAD_REQUEST,
+                    "Failed to parse bytes from request body",
+                )
+            }
+        }) {
+            Ok(info) => info,
+            Err(_) => {
+                return m_resp(
                 StatusCode::BAD_REQUEST,
                 "Failed to parse JSON from request body. Ensure the correct parameters are given.",
             );
-        }
-    };
+            }
+        };
     let resources = ContainerResources {
         cpu_shares: 512,
         memory: container_info.memory,
